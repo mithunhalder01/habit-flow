@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Habit Flow</title>
+    <script>
+      // Redirect deep links back to index.html for client-side routing on GitHub Pages.
+      const pathSegmentsToKeep = 1;
+      const locationRef = window.location;
+      const repoPath = locationRef.pathname
+        .split('/')
+        .slice(0, 1 + pathSegmentsToKeep)
+        .join('/');
+      const routePath = locationRef.pathname
+        .slice(1)
+        .split('/')
+        .slice(pathSegmentsToKeep)
+        .join('/')
+        .replace(/&/g, '~and~');
+      const search = locationRef.search
+        ? '&' + locationRef.search.slice(1).replace(/&/g, '~and~')
+        : '';
+
+      locationRef.replace(
+        locationRef.protocol +
+          '//' +
+          locationRef.hostname +
+          (locationRef.port ? ':' + locationRef.port : '') +
+          repoPath +
+          '/?/' +
+          routePath +
+          search +
+          locationRef.hash
+      );
+    </script>
+  </head>
+  <body></body>
+</html>
