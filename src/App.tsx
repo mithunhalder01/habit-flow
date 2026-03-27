@@ -14,6 +14,33 @@ import Sidebar from './components/Sidebar';
 import AdminPanel from './components/AdminPanel';
 import NotificationPanel from './components/NotificationPanel';
 
+const APP_BASE_PATH = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+
+const toAppPath = (browserPath: string): string => {
+  if (!APP_BASE_PATH || APP_BASE_PATH === '/') {
+    return browserPath || '/';
+  }
+
+  if (browserPath === APP_BASE_PATH) {
+    return '/';
+  }
+
+  if (browserPath.startsWith(`${APP_BASE_PATH}/`)) {
+    return browserPath.slice(APP_BASE_PATH.length) || '/';
+  }
+
+  return browserPath || '/';
+};
+
+const toBrowserPath = (appPath: string): string => {
+  const normalizedAppPath = appPath.startsWith('/') ? appPath : `/${appPath}`;
+  if (!APP_BASE_PATH || APP_BASE_PATH === '/') {
+    return normalizedAppPath;
+  }
+
+  return `${APP_BASE_PATH}${normalizedAppPath === '/' ? '' : normalizedAppPath}`;
+};
+
 const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -21,7 +48,7 @@ const AppContent: React.FC = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [pathname, setPathname] = useState(window.location.pathname);
+  const [pathname, setPathname] = useState(() => toAppPath(window.location.pathname));
   const { state } = useAuth();
 
   const refreshUnreadNotifications = () => {
@@ -36,15 +63,16 @@ const AppContent: React.FC = () => {
   };
 
   const navigateTo = (nextPath: string) => {
-    if (window.location.pathname !== nextPath) {
-      window.history.pushState({}, '', nextPath);
-      setPathname(nextPath);
+    const browserPath = toBrowserPath(nextPath);
+    if (window.location.pathname !== browserPath) {
+      window.history.pushState({}, '', browserPath);
+      setPathname(toAppPath(browserPath));
     }
   };
 
   useEffect(() => {
     const handlePopState = () => {
-      setPathname(window.location.pathname);
+      setPathname(toAppPath(window.location.pathname));
     };
 
     window.addEventListener('popstate', handlePopState);
