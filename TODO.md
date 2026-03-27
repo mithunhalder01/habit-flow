@@ -1,0 +1,1 @@
+# Navbar Logo Addition Plan - Approved Steps\n\n## Breakdown:\n1. [x] Create TODO.md\n2. [x] Edit src/components/Navbar.tsx to add logo\n3. [x] Verify changes (build/test)\n4. [ ] attempt_completion\n\nProgress: Steps 1-3 complete. Navbar updated with logo.svg replacing TH placeholder. Build succeeded (no errors reported).
