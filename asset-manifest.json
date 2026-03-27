@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/habit-flow/static/css/main.cd10d77d.css",
+    "main.js": "/habit-flow/static/js/main.d9c8a3e7.js",
+    "static/js/453.46946cc9.chunk.js": "/habit-flow/static/js/453.46946cc9.chunk.js",
+    "index.html": "/habit-flow/index.html",
+    "main.cd10d77d.css.map": "/habit-flow/static/css/main.cd10d77d.css.map",
+    "main.d9c8a3e7.js.map": "/habit-flow/static/js/main.d9c8a3e7.js.map",
+    "453.46946cc9.chunk.js.map": "/habit-flow/static/js/453.46946cc9.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.cd10d77d.css",
+    "static/js/main.d9c8a3e7.js"
+  ]
+}
