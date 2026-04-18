@@ -151,8 +151,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(result.user, { displayName: name });
       // User mapped by onAuthStateChanged
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      result;
     } catch (error: any) {
       dispatch({ type: 'LOGIN_ERROR', payload: getErrorMessage(error.code) });
     }

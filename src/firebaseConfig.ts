@@ -1,16 +1,19 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDT2h8eyx6pMR0Hjw7BkqoVKDUGueSxSlg",
-  authDomain: "habitflow01.firebaseapp.com",
-  databaseURL: "https://habitflow01-default-rtdb.firebaseio.com",
-  projectId: "habitflow01",
-  storageBucket: "habitflow01.firebasestorage.app",
-  messagingSenderId: "285022475213",
-  appId: "1:285022475213:web:fa57c343ea674cb8e36a84",
-  measurementId: "G-VH7RF85B8V"
-};
+let firebaseConfig;
+try {
+  firebaseConfig = (window as any).firebaseConfig || JSON.parse((document.querySelector('head [type="application/json"]') as any)?.textContent || '{}');
+} catch (e) {
+  firebaseConfig = {
+    apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "YOUR_API_KEY",
+    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "YOUR_PROJECT.firebaseapp.com",
+    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "YOUR_PROJECT_ID",
+    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "YOUR_PROJECT.appspot.com",
+    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "YOUR_MESSAGING_ID",
+    appId: process.env.REACT_APP_FIREBASE_APP_ID || "YOUR_APP_ID"
+  };
+}
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
