@@ -1,11 +1,19 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { User, AuthState } from '../types';
+import { auth } from '../firebaseConfig';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  signInWithPopup,
+  User as FirebaseUser,
+  updateProfile
+} from 'firebase/auth';
 
-export const ADMIN_USERNAME = 'admin';
 export const ADMIN_EMAIL = 'admin@habitflow.com';
-export const ADMIN_PASSWORD = 'admin123';
-const USER_LIST_STORAGE_KEY = 'users';
-const CURRENT_USER_STORAGE_KEY = 'user';
 
 type AuthAction = 
   | { type: 'LOGIN_START' }
@@ -47,72 +55,44 @@ interface AuthContextType {
   ) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
+  loginWithGoogle: () => Promise<void>;
+  loginWithFacebook: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const isAdminIdentifier = (identifier: string): boolean => {
-  const normalized = identifier.trim().toLowerCase();
-  return normalized === ADMIN_USERNAME || normalized === ADMIN_EMAIL;
-};
-
-const createAdminUser = (): User => ({
-  id: 'admin-1',
-  email: ADMIN_EMAIL,
-  name: ADMIN_USERNAME,
-  role: 'admin',
-  blocked: false,
-  createdAt: new Date('2026-01-01T00:00:00.000Z'),
-  lastLoginAt: new Date(),
-});
-
-const normalizeUser = (user: any): User => ({
-  ...user,
-  role: user.role || getUserRole(user.email || ''),
-  blocked: Boolean(user.blocked),
-});
-
-const readUsers = (): User[] => {
-  const savedUsers = localStorage.getItem(USER_LIST_STORAGE_KEY);
-  if (!savedUsers) return [];
-
-  try {
-    const parsedUsers = JSON.parse(savedUsers);
-    if (!Array.isArray(parsedUsers)) return [];
-    return parsedUsers.map((user) => normalizeUser(user));
-  } catch (error) {
-    return [];
-  }
-};
-
-const writeUsers = (users: User[]) => {
-  localStorage.setItem(USER_LIST_STORAGE_KEY, JSON.stringify(users));
-};
-
-const ensureAdminInUsers = (users: User[]): User[] => {
-  const adminIndex = users.findIndex(
-    (user) => user.role === 'admin' || user.email?.toLowerCase() === ADMIN_EMAIL
-  );
-
-  if (adminIndex === -1) {
-    return [...users, createAdminUser()];
-  }
-
-  const existingAdmin = users[adminIndex];
-  const normalizedAdmin: User = {
-    ...existingAdmin,
-    id: existingAdmin.id || 'admin-1',
-    email: ADMIN_EMAIL,
-    name: ADMIN_USERNAME,
-    role: 'admin',
+const firebaseUserToUser = (firebaseUser: FirebaseUser): User => {
+  const role = firebaseUser.email === ADMIN_EMAIL ? 'admin' : 'user';
+  return {
+    id: firebaseUser.uid,
+    email: firebaseUser.email || '',
+    name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+    role,
     blocked: false,
+    createdAt: firebaseUser.metadata.creationTime ? new Date(firebaseUser.metadata.creationTime) : new Date(),
+    lastLoginAt: firebaseUser.metadata.lastSignInTime ? new Date(firebaseUser.metadata.lastSignInTime) : new Date(),
   };
-
-  return users.map((user, index) => (index === adminIndex ? normalizedAdmin : user));
 };
 
-const getUserRole = (identifier: string): 'admin' | 'user' => {
-  return isAdminIdentifier(identifier) ? 'admin' : 'user';
+const getErrorMessage = (errorCode: string): string => {
+  switch (errorCode) {
+    case 'auth/user-not-found':
+      return 'No account found with this email.';
+    case 'auth/wrong-password':
+      return 'Incorrect password.';
+    case 'auth/user-disabled':
+      return 'This account has been disabled.';
+    case 'auth/email-already-in-use':
+      return 'Email already in use.';
+    case 'auth/invalid-email':
+      return 'Invalid email address.';
+    case 'auth/weak-password':
+      return 'Password too weak.';
+    case 'auth/too-many-requests':
+      return 'Too many failed attempts. Try again later.';
+    default:
+      return 'Authentication failed. Please try again.';
+  }
 };
 
 export const useAuth = () => {
@@ -127,38 +107,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [state, dispatch] = useReducer(authReducer, initialState);
 
   useEffect(() => {
-    const users = ensureAdminInUsers(readUsers());
-    writeUsers(users);
-
-    const savedUser = localStorage.getItem(CURRENT_USER_STORAGE_KEY);
-    if (savedUser) {
-      const parsedUser = normalizeUser(JSON.parse(savedUser));
-      const storedUser = users.find(
-        (user) =>
-          user.id === parsedUser.id || user.email?.toLowerCase() === parsedUser.email?.toLowerCase()
-      );
-
-      if (!storedUser) {
-        localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const user = firebaseUserToUser(firebaseUser);
+        dispatch({ type: 'LOGIN_SUCCESS', payload: user });
+      } else {
         dispatch({ type: 'SET_LOADING', payload: false });
-        return;
       }
+    });
 
-      if (storedUser.blocked) {
-        localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
-        dispatch({ type: 'LOGIN_ERROR', payload: 'Your account is blocked by admin.' });
-        return;
-      }
-
-      const normalizedSessionUser: User = {
-        ...storedUser,
-        blocked: false,
-      };
-      localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(normalizedSessionUser));
-      dispatch({ type: 'LOGIN_SUCCESS', payload: normalizedSessionUser });
-    } else {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
+    return () => unsubscribe();
   }, []);
 
   const login = async (
@@ -167,128 +125,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     options?: { adminOnly?: boolean; allowAdmin?: boolean }
   ) => {
     dispatch({ type: 'LOGIN_START' });
-    
-    setTimeout(() => {
-      const trimmedIdentifier = email.trim().toLowerCase();
-      const isAdminLogin = isAdminIdentifier(trimmedIdentifier);
-      let users = ensureAdminInUsers(readUsers());
-      const allowAdmin = options?.allowAdmin ?? true;
-      const adminOnly = options?.adminOnly ?? false;
 
-      if (adminOnly && !isAdminLogin) {
-        dispatch({ type: 'LOGIN_ERROR', payload: 'Use admin username/email for admin access.' });
-        return;
-      }
+    if (email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase() && options?.adminOnly !== true) {
+      dispatch({ type: 'LOGIN_ERROR', payload: 'Admin login is available only on /admin.' });
+      return;
+    }
 
-      if (!allowAdmin && isAdminLogin) {
-        dispatch({ type: 'LOGIN_ERROR', payload: 'Admin login is available only on /admin.' });
-        return;
-      }
-
-      if (isAdminLogin && password !== ADMIN_PASSWORD) {
-        dispatch({ type: 'LOGIN_ERROR', payload: 'Invalid admin credentials.' });
-        return;
-      }
-
-      let user: User | undefined;
-
-      if (isAdminLogin) {
-        const adminUser = users.find((item) => item.role === 'admin') || createAdminUser();
-        user = {
-          ...adminUser,
-          email: ADMIN_EMAIL,
-          name: ADMIN_USERNAME,
-          role: 'admin',
-          blocked: false,
-          lastLoginAt: new Date(),
-        };
-
-        users = users.map((item) => (item.id === adminUser.id ? user! : item));
-      } else {
-        const existingUser = users.find(
-          (item) => item.email?.toLowerCase() === trimmedIdentifier
-        );
-
-        if (existingUser?.blocked) {
-          dispatch({ type: 'LOGIN_ERROR', payload: 'Your account is blocked by admin.' });
-          return;
-        }
-
-        if (existingUser) {
-          user = {
-            ...existingUser,
-            lastLoginAt: new Date(),
-            role: existingUser.role || 'user',
-            blocked: Boolean(existingUser.blocked),
-          };
-          users = users.map((item) => (item.id === existingUser.id ? user! : item));
-        } else {
-          user = {
-            id: Date.now().toString(),
-            email: email.trim(),
-            name: email.split('@')[0],
-            role: 'user',
-            blocked: false,
-            createdAt: new Date(),
-            lastLoginAt: new Date(),
-          };
-          users = [...users, user];
-        }
-      }
-
-      writeUsers(users);
-      localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
-      dispatch({ type: 'LOGIN_SUCCESS', payload: user });
-    }, 1000);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // User mapped by onAuthStateChanged
+    } catch (error: any) {
+      dispatch({ type: 'LOGIN_ERROR', payload: getErrorMessage(error.code) });
+    }
   };
 
   const signup = async (email: string, password: string, name: string) => {
     dispatch({ type: 'LOGIN_START' });
-    
-    setTimeout(() => {
-      const trimmedEmail = email.trim().toLowerCase();
 
-      if (isAdminIdentifier(trimmedEmail)) {
-        dispatch({ type: 'LOGIN_ERROR', payload: 'Admin account cannot be created from sign up.' });
-        return;
-      }
+    if (email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase()) {
+      dispatch({ type: 'LOGIN_ERROR', payload: 'Admin account cannot be created from sign up.' });
+      return;
+    }
 
-      let users = ensureAdminInUsers(readUsers());
-      const userAlreadyExists = users.some(
-        (user) => user.email?.toLowerCase() === trimmedEmail
-      );
-
-      if (userAlreadyExists) {
-        dispatch({ type: 'LOGIN_ERROR', payload: 'Account already exists. Please sign in.' });
-        return;
-      }
-
-      const user: User = {
-        id: Date.now().toString(),
-        email: email.trim(),
-        name,
-        role: 'user',
-        blocked: false,
-        createdAt: new Date(),
-        lastLoginAt: new Date(),
-      };
-
-      users = [...users, user];
-      writeUsers(users);
-      localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
-      dispatch({ type: 'LOGIN_SUCCESS', payload: user });
-    }, 1000);
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(result.user, { displayName: name });
+      // User mapped by onAuthStateChanged
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      result;
+    } catch (error: any) {
+      dispatch({ type: 'LOGIN_ERROR', payload: getErrorMessage(error.code) });
+    }
   };
 
-  const logout = () => {
-    localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
-    localStorage.removeItem('todos');
-    localStorage.removeItem('habits');
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.removeItem('todos');
+      localStorage.removeItem('habits');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
     dispatch({ type: 'LOGOUT' });
   };
 
+  const loginWithGoogle = async () => {
+    dispatch({ type: 'LOGIN_START' });
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      // User mapped by onAuthStateChanged
+    } catch (error: any) {
+      dispatch({ type: 'LOGIN_ERROR', payload: getErrorMessage(error.code) });
+    }
+  };
+
+  const loginWithFacebook = async () => {
+    dispatch({ type: 'LOGIN_START' });
+    const provider = new FacebookAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      // User mapped by onAuthStateChanged
+    } catch (error: any) {
+      dispatch({ type: 'LOGIN_ERROR', payload: getErrorMessage(error.code) });
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ state, login, signup, logout }}>
+    <AuthContext.Provider value={{ state, login, signup, logout, loginWithGoogle, loginWithFacebook }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,1 +1,15 @@
-# Navbar Logo Addition Plan - Approved Steps\n\n## Breakdown:\n1. [x] Create TODO.md\n2. [x] Edit src/components/Navbar.tsx to add logo\n3. [x] Verify changes (build/test)\n4. [ ] attempt_completion\n\nProgress: Steps 1-3 complete. Navbar updated with logo.svg replacing TH placeholder. Build succeeded (no errors reported).
+# Firebase Auth Integration Plan Progress
+
+## Completed:
+- [x] Create src/firebaseConfig.ts (placeholders - user to update with real credentials)
+- [x] Run `npm install firebase`
+- [x] Refactor src/context/AuthContext.tsx to Firebase Auth
+- [x] Update src/components/Login.tsx for compatibility
+
+## Pending:
+- [ ] Update Firebase config with real credentials in src/firebaseConfig.ts
+- [ ] Enable Email/Password, Google, Facebook providers in Firebase Console Authentication
+- [ ] For Facebook: setup OAuth redirect URI in Meta Developers
+- [ ] Test: npm start, try login/signup/social logins
+- [ ] Admin: Create admin@habitflow.com user in Firebase, role auto-assigned by email
+

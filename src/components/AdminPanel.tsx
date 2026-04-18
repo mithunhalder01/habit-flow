@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTodo } from '../context/TodoContext';
-import { ADMIN_EMAIL, ADMIN_USERNAME } from '../context/AuthContext';
+import { ADMIN_EMAIL } from '../context/AuthContext';
 import { User } from '../types';
 import {
   UsersIcon,
@@ -111,7 +111,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       parsedUsers.push({
         id: 'admin-1',
         email: ADMIN_EMAIL,
-        name: ADMIN_USERNAME,
+        name: 'Admin',
         role: 'admin',
         blocked: false,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
